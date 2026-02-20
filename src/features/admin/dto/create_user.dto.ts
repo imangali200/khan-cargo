@@ -28,11 +28,12 @@ export class CreateUserDto {
     role: UserRoles;
 
     @IsNumber()
-    @ApiProperty({ example: 1 })
-    branchId: number;
+    @IsOptional()
+    @ApiProperty({ example: 1, required: false })
+    branchId?: number;
 
     @IsString()
     @IsOptional()
-    @ApiProperty({ example: 'user@example.com', required: false })
-    email?: string;
+    @ApiProperty({ example: '@username', required: false })
+    telegramUsername?: string;
 }

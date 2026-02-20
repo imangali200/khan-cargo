@@ -47,13 +47,15 @@ export class BranchController {
     @Auth([UserRoles.SUPERADMIN])
     @ApiOperation({ summary: 'Soft delete branch' })
     async remove(@Param('id') id: number) {
-        return this.branchService.remove(id);
+        await this.branchService.remove(id);
+        return { message: 'Branch deleted successfully (soft-delete)' };
     }
 
     @Delete(':id/permanent')
     @Auth([UserRoles.SUPERADMIN])
     @ApiOperation({ summary: 'Permanent delete branch (SUPERADMIN only)' })
     async permanentRemove(@Param('id') id: number) {
-        return this.branchService.permanentRemove(id);
+        await this.branchService.permanentRemove(id);
+        return { message: 'Branch permanently deleted' };
     }
 }

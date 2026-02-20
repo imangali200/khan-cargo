@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Param, Patch, Post, Query, Req, UploadedFile, UseInterceptors } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
-import { ApiConsumes, ApiOperation, ApiQuery, ApiTags } from "@nestjs/swagger";
+import { ApiBody, ApiConsumes, ApiOperation, ApiQuery, ApiTags } from "@nestjs/swagger";
 import { Auth } from "src/core/decorators/auth.decorators";
 import { BranchScoped } from "src/core/decorators/branch-scoped.decorator";
 import { CurrentUser } from "src/core/decorators/current-user.decorator";
@@ -94,6 +94,21 @@ export class TrackingController {
     @Auth([UserRoles.SUPERADMIN])
     @UseInterceptors(FileInterceptor('file'))
     @ApiConsumes('multipart/form-data')
+    @ApiBody({
+        schema: {
+            type: 'object',
+            properties: {
+                file: {
+                    type: 'string',
+                    format: 'binary',
+                },
+                targetStatus: {
+                    type: 'string',
+                    enum: Object.values(TrackingStatus),
+                }
+            },
+        },
+    })
     @ApiOperation({ summary: 'Excel import: bulk update statuses (SUPERADMIN only)' })
     async importExcel(
         @UploadedFile() file: Express.Multer.File,

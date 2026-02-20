@@ -139,6 +139,11 @@ export class TrackingService {
 
         const prevStatus = item.currentStatus;
         item.currentStatus = dto.status;
+
+        if (dto.weight !== undefined) {
+            item.weight = dto.weight;
+        }
+
         await this.trackingRepo.save(item);
 
         await this.statusHistoryRepo.save({

@@ -25,11 +25,6 @@ export class BranchEntity extends BaseCustomEntity {
     @JoinColumn({ name: 'adminId' })
     admin?: UserEntity;
 
-    @Column({ length: 100, nullable: true })
-    @ApiProperty({ example: '-100123456789', required: false })
-    @IsString()
-    telegramChatId?: string;
-
     @Column({ nullable: true })
     @ApiProperty({ example: 123, required: false })
     @IsNumber()

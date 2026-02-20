@@ -69,12 +69,13 @@ export class TelegramService {
     }
 
     async notifyAllBranchArrivals(branchId: number): Promise<{ usersNotified: number; itemsNotified: number }> {
-        // Find branch with its chatId
         const branch = await this.branchRepo.findOne({ where: { id: branchId } });
-        if (!branch?.telegramChatId) {
-            this.logger.warn(`No Telegram chat configured for branch ${branchId}`);
+        if (!branch) {
+            this.logger.warn(`Branch ${branchId} not found`);
             return { usersNotified: 0, itemsNotified: 0 };
         }
+
+        const globalChatId = this.configService.getOrThrow('TELEGRAM_CHAT_ID');
 
         // Find all items that need notification (Arrived at branch AND not yet notified)
         const items = await this.trackingRepo.find({
@@ -104,7 +105,7 @@ export class TelegramService {
             if (!user) continue;
 
             const message = this.buildInvoiceMessage(user, userItems, branch, pricePerKg, dollarRate);
-            const success = await this.sendMessage(branch.telegramChatId, message, branch.telegramThreadId);
+            const success = await this.sendMessage(globalChatId, message, branch.telegramThreadId);
 
             if (success) {
                 // Mark items as notified
@@ -129,6 +130,7 @@ export class TelegramService {
     ): string {
         const userName = user.name || 'Клиент';
         const userCode = user.userCode || `ID:${user.id}`;
+        const mention = user.telegramUsername ? (user.telegramUsername.startsWith('@') ? user.telegramUsername : `@${user.telegramUsername}`) : `<b>${userName}</b>`;
 
         let totalWeight = 0;
         const lines: string[] = [];
@@ -144,7 +146,7 @@ export class TelegramService {
         const costTenge = Math.round(totalWeight * pricePerKg * dollarRate);
 
         return [
-            `📦 <b>${userName}</b> (${userCode})`,
+            `📦 ${mention} (${userCode})`,
             ``,
             `Сіздің тауарларыңыз филиалға жетті:`,
             ``,

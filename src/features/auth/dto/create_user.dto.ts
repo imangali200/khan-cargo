@@ -29,6 +29,6 @@ export class CreateUserDto {
 
     @IsString()
     @IsOptional()
-    @ApiProperty({ example: 'user@example.com', required: false })
-    email?: string;
+    @ApiProperty({ example: '@username', required: false, description: 'Telegram nickname starting with @' })
+    telegramUsername?: string;
 }

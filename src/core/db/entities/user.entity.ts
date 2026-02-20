@@ -23,10 +23,10 @@ export class UserEntity extends BaseCustomEntity {
     lastName: string;
 
     @Column({ length: 255, nullable: true, unique: true })
-    @ApiProperty({ example: 'user@example.com', required: false })
+    @ApiProperty({ example: '@username', required: false, description: 'Telegram nickname starting with @' })
     @IsString()
     @IsOptional()
-    email?: string;
+    telegramUsername?: string;
 
     @Column({ length: 20, unique: true, nullable: true })
     @ApiProperty({ example: '87087563192', required: false })
@@ -45,8 +45,8 @@ export class UserEntity extends BaseCustomEntity {
     @IsString()
     password: string;
 
-    @Column({ type: 'enum', enum: UserRoles, default: UserRoles.SUPERADMIN })
-    @ApiProperty({ enum: UserRoles, example: UserRoles.ADMIN })
+    @Column({ type: 'enum', enum: UserRoles, default: UserRoles.USER })
+    @ApiProperty({ enum: UserRoles, example: UserRoles.USER })
     @IsEnum(UserRoles)
     role: UserRoles;
 

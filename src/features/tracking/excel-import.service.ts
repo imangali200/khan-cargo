@@ -48,11 +48,23 @@ export class ExcelImportService {
         // Parse Excel
         const workbook = XLSX.read(file.buffer, { type: 'buffer' });
         const sheet = workbook.Sheets[workbook.SheetNames[0]];
-        const rows: ImportRow[] = XLSX.utils.sheet_to_json(sheet);
 
-        // Deduplicate tracking codes
+        // Get raw data (array of arrays)
+        const rawRows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+
+        // Extract tracking codes from the first column (A)
+        // We skip empty rows and potentially skip the header row if it contains keywords
         const uniqueCodes = [...new Set(
-            rows.map(r => String(r.trackingCode).trim()).filter(c => c.length > 0)
+            rawRows
+                .map(row => (row && row.length > 0 ? String(row[0]).trim() : ''))
+                .filter(c => {
+                    const low = c.toLowerCase();
+                    return c.length > 0 &&
+                        low !== 'trackingcode' &&
+                        low !== 'tracking code' &&
+                        low !== 'номер' &&
+                        low !== 'трек';
+                })
         )];
 
         // Fetch all matching items in one query (avoid N+1)
@@ -80,12 +92,10 @@ export class ExcelImportService {
             }
 
             // Branch validation for ARRIVED_BRANCH
+            // Note: If we need branchId from Excel in the future, we can add it back
+            // focusing on a specific column (e.g. column B)
             if (targetStatus === TrackingStatus.ARRIVED_BRANCH) {
-                const row = rows.find(r => String(r.trackingCode).trim() === code);
-                if (row?.branchId && row.branchId !== item.branchId) {
-                    errors.push({ code, reason: 'BRANCH_MISMATCH' });
-                    continue;
-                }
+                // For now, if user only provides codes in A1, we skip branch matching
             }
 
             const prevStatus = item.currentStatus;

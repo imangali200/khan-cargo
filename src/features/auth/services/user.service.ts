@@ -28,7 +28,7 @@ export class UserService {
 
         if (search) {
             qb.where(
-                '(user.name ILIKE :search OR user.lastName ILIKE :search OR user.phoneNumber ILIKE :search OR user.email ILIKE :search OR user.userCode ILIKE :search OR CAST(user.id AS TEXT) = :exactSearch)',
+                '(user.name ILIKE :search OR user.lastName ILIKE :search OR user.phoneNumber ILIKE :search OR user.telegramUsername ILIKE :search OR user.userCode ILIKE :search OR CAST(user.id AS TEXT) = :exactSearch)',
                 { search: `%${search}%`, exactSearch: search }
             );
         }
@@ -50,8 +50,19 @@ export class UserService {
     }
 
     async createUser(createDto: CreateUserDto): Promise<UserEntity> {
-        const user = await this.userRepository.findOne({ where: { phoneNumber: createDto.phoneNumber } });
-        if (user) throw new ConflictException('User with this phone number already exists');
+        // Check phone number
+        const phoneExists = await this.userRepository.findOne({ where: { phoneNumber: createDto.phoneNumber } });
+        if (phoneExists) throw new ConflictException('User with this phone number already exists');
+
+        // Check user code
+        const codeExists = await this.userRepository.findOne({ where: { userCode: createDto.userCode } });
+        if (codeExists) throw new ConflictException(`User with code ${createDto.userCode} already exists`);
+
+        // Check telegram username if provided
+        if (createDto.telegramUsername) {
+            const usernameExists = await this.userRepository.findOne({ where: { telegramUsername: createDto.telegramUsername } });
+            if (usernameExists) throw new ConflictException('User with this Telegram username already exists');
+        }
 
         const hashPassword = await bcrypt.hash(createDto.password, 10);
         const newUser = this.userRepository.create({

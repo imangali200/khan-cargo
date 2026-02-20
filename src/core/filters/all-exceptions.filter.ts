@@ -19,16 +19,21 @@ export class AllExceptionsFilter implements ExceptionFilter {
         const ctx = host.switchToHttp();
         const request = ctx.getRequest();
 
-        const httpStatus =
+        let httpStatus =
             exception instanceof HttpException
                 ? exception.getStatus()
                 : HttpStatus.INTERNAL_SERVER_ERROR;
+
+        // Map DB Unique constraint to 409 Conflict
+        if ((exception as any)?.code === '23505') {
+            httpStatus = HttpStatus.CONFLICT;
+        }
 
         const responseBody = {
             statusCode: httpStatus,
             timestamp: new Date().toISOString(),
             path: httpAdapter.getRequestUrl(request),
-            message: (exception as any)?.response?.message || (exception as any)?.message || 'Internal server error',
+            message: (exception as any)?.response?.message || (exception as any)?.detail || (exception as any)?.message || 'Internal server error',
         };
 
         // Advanced Logging Logic
