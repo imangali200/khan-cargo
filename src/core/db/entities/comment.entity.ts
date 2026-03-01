@@ -28,9 +28,6 @@ export class CommentEntity extends BaseCustomEntity {
     @IsString()
     content: string;
 
-    @Column({ default: false })
-    isHidden: boolean;
-
     @DeleteDateColumn()
     deletedAt?: Date;
 }

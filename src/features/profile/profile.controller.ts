@@ -62,4 +62,16 @@ export class ProfileController {
     ) {
         return this.profileService.getMyTrackingItems(userId, page ? Number(page) : 1, limit ? Number(limit) : 20);
     }
+
+    @Get('trackingArchive')
+    @ApiOperation({ summary: 'Get archive tracks' })
+    @ApiQuery({ name: 'page', required: false })
+    @ApiQuery({ name: 'limit', required: false })
+    async getMyArchiveTracking(
+        @CurrentUser('sub') userId: number,
+        @Query('page') page?: number,
+        @Query('limit') limit?: number
+    ) {
+        return this.profileService.getMyArchiveTracking(userId, page ? Number(page) : 1, limit ? Number(limit) : 20)
+    }
 }

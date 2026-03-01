@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
+import { IsNull, Not, Repository } from "typeorm";
 import { UserEntity } from "src/core/db/entities/user.entity";
 import { PostEntity } from "src/core/db/entities/post.entity";
 import { PostLikeEntity } from "src/core/db/entities/post-like.entity";
@@ -28,7 +28,7 @@ export class ProfileService {
             where: { id: userId },
             relations: ['branch'],
         });
-        if (!user) throw new NotFoundException('User not found');
+        if (!user) throw new NotFoundException('Пользователь не найден');
 
         const { password, ...userWithoutPassword } = user;
         return userWithoutPassword;
@@ -36,11 +36,11 @@ export class ProfileService {
 
     async updateProfile(userId: number, dto: UpdateProfileDto) {
         const user = await this.userRepo.findOne({ where: { id: userId } });
-        if (!user) throw new NotFoundException('User not found');
+        if (!user) throw new NotFoundException('Пользователь не найден');
 
         if (dto.branchId) {
             const branch = await this.branchRepo.findOne({ where: { id: dto.branchId } });
-            if (!branch) throw new NotFoundException('Branch not found');
+            if (!branch) throw new NotFoundException('Склад не найден');
         }
 
         const merged = this.userRepo.merge(user, dto);
@@ -49,10 +49,9 @@ export class ProfileService {
         return result;
     }
 
-    async getMyPosts(userId: number, page = 1, limit = 20) {
+    async getMyPosts(userId: number, page: number, limit: number) {
         const [data, total] = await this.postRepo.findAndCount({
             where: { authorId: userId },
-            relations: ['branch'],
             order: { createdAt: 'DESC' },
             skip: (page - 1) * limit,
             take: limit,
@@ -60,12 +59,10 @@ export class ProfileService {
         return { data, meta: { page, limit, total, lastPage: Math.ceil(total / limit) } };
     }
 
-    async getLikedPosts(userId: number, page = 1, limit = 20) {
+    async getLikedPosts(userId: number, page: number, limit: number) {
         const qb = this.postRepo.createQueryBuilder('post')
             .innerJoin('post_like', 'like', 'like.postId = post.id AND like.userId = :userId', { userId })
             .leftJoinAndSelect('post.author', 'author')
-            .leftJoinAndSelect('post.branch', 'branch')
-            .where('post.isHidden = false')
             .orderBy('like.createdAt', 'DESC')
             .skip((page - 1) * limit)
             .take(limit);
@@ -74,11 +71,23 @@ export class ProfileService {
         return { data, meta: { page, limit, total, lastPage: Math.ceil(total / limit) } };
     }
 
-    async getMyTrackingItems(userId: number, page = 1, limit = 20) {
+    async getMyTrackingItems(userId: number, page: number, limit: number) {
         const [data, total] = await this.trackingRepo.findAndCount({
             where: { createdByUserId: userId },
-            relations: ['branch'],
             order: { createdAt: 'DESC' },
+            skip: (page - 1) * limit,
+            take: limit,
+        });
+        return { data, meta: { page, limit, total, lastPage: Math.ceil(total / limit) } };
+    }
+    async getMyArchiveTracking(userId: number, page: number, limit: number) {
+        const [data, total] = await this.trackingRepo.findAndCount({
+            where: {
+                createdByUserId: userId,
+                deletedAt: Not(IsNull())
+            },
+            withDeleted: true,
+            order: { deletedAt: 'DESC' },
             skip: (page - 1) * limit,
             take: limit,
         });

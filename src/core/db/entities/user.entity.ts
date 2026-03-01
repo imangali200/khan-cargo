@@ -10,10 +10,9 @@ import { OneToMany } from "typeorm";
 
 @Entity('user')
 export class UserEntity extends BaseCustomEntity {
-    @Column({ length: 100, nullable: true })
+    @Column({ length: 100 })
     @ApiProperty({ example: 'Imangali', required: false })
     @IsString()
-    @IsOptional()
     name: string;
 
     @Column({ length: 100, nullable: true })
@@ -28,13 +27,25 @@ export class UserEntity extends BaseCustomEntity {
     @IsOptional()
     telegramUsername?: string;
 
-    @Column({ length: 20, unique: true, nullable: true })
+    @Column({ length: 500, nullable: true })
+    @ApiProperty({ required: false })
+    @IsString()
+    @IsOptional()
+    profilePhotoUrl?: string;
+
+    @Column({ length: 255, nullable: true })
+    @ApiProperty({ required: false })
+    @IsString()
+    @IsOptional()
+    profilePhotoPublicId?: string;
+
+    @Column({ length: 20, unique: true })
     @ApiProperty({ example: '87087563192', required: false })
     @IsString()
     @IsOptional()
     phoneNumber: string;
 
-    @Column({ length: 50, unique: true, nullable: true })
+    @Column({ length: 50, unique: true })
     @ApiProperty({ example: 'Khan-123', required: false })
     @IsString()
     @IsOptional()

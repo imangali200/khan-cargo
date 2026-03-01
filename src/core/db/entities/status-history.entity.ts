@@ -43,7 +43,4 @@ export class StatusHistoryEntity extends BaseCustomEntity {
     @JoinColumn({ name: 'importLogId' })
     importLog?: ImportLogEntity;
 
-    @Column('text', { nullable: true })
-    @ApiProperty({ required: false })
-    note?: string;
 }

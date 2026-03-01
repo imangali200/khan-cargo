@@ -29,17 +29,17 @@ export class BranchService {
 
     async create(dto: CreateBranchDto): Promise<BranchEntity> {
         const exists = await this.branchRepo.findOne({ where: { name: dto.name } });
-        if (exists) throw new ConflictException('Branch with this name already exists');
+        if (exists) throw new ConflictException('Склад с таким названием уже существует');
 
         if (dto.adminId) {
             const user = await this.userRepo.findOne({ where: { id: dto.adminId } });
-            if (!user) throw new NotFoundException('Admin user not found');
-            if (user.role !== UserRoles.ADMIN && user.role !== UserRoles.SUPERADMIN) {
-                throw new ConflictException('Selected user is not an admin');
+            if (!user) throw new NotFoundException('Администратор не найден');
+            if (user.role !== UserRoles.ADMIN) {
+                throw new ConflictException('Выбранный пользователь не является администратором');
             }
 
             const existingBranch = await this.branchRepo.findOne({ where: { adminId: dto.adminId } });
-            if (existingBranch) throw new ConflictException('This admin is already assigned to another branch');
+            if (existingBranch) throw new ConflictException('Этот администратор уже привязан к другому складу');
         }
 
         const branch = this.branchRepo.create(dto);
@@ -54,7 +54,7 @@ export class BranchService {
 
     async findOne(id: number) {
         const branch = await this.branchRepo.findOne({ where: { id } })
-        if (!branch) throw new NotFoundException('User is not found')
+        if (!branch) throw new NotFoundException('Склад не найден')
         return branch
     }
 
@@ -63,9 +63,9 @@ export class BranchService {
 
         if (dto.adminId) {
             const user = await this.userRepo.findOne({ where: { id: dto.adminId } });
-            if (!user) throw new NotFoundException('Admin user not found');
-            if (user.role !== UserRoles.ADMIN && user.role !== UserRoles.SUPERADMIN) {
-                throw new ConflictException('Selected user is not an admin');
+            if (!user) throw new NotFoundException('Администратор не найден');
+            if (user.role !== UserRoles.ADMIN) {
+                throw new ConflictException('Выбранный пользователь не является администратором');
             }
         }
 

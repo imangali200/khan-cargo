@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, Req, UploadedFile, UseInterceptors } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, UploadedFile, UseInterceptors } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
 import { ApiBody, ApiConsumes, ApiOperation, ApiQuery, ApiTags } from "@nestjs/swagger";
 import { Auth } from "src/core/decorators/auth.decorators";
@@ -12,6 +12,8 @@ import { CreateTrackingDto } from "./dto/create-tracking.dto";
 import { UpdateStatusDto } from "./dto/update-status.dto";
 import { TrackingFilterDto } from "./dto/tracking-filter.dto";
 import { QuickUpdateDto } from "./dto/quick-update.dto";
+import { UpdateTrackDto } from "./dto/update-tracking.dto";
+import { UserEntity } from "src/core/db/entities/user.entity";
 
 @Controller('tracking')
 @ApiTags('Tracking')
@@ -38,7 +40,7 @@ export class TrackingController {
     }
 
     @Get('search')
-    @Auth([UserRoles.USER, UserRoles.ADMIN, UserRoles.SUPERADMIN])
+    @Auth([UserRoles.ADMIN, UserRoles.SUPERADMIN])
     @ApiOperation({ summary: 'Search tracking item by code' })
     @ApiQuery({ name: 'trackingCode', required: true, example: 'KH-001' })
     async searchByCode(@Query('trackingCode') trackingCode: string) {
@@ -74,6 +76,13 @@ export class TrackingController {
     async findOne(@Param('id') id: number, @Req() req: any) {
         const branchId = req.branchIdScope;
         return this.trackingService.findOne(id, branchId);
+    }
+
+    @Patch(':id')
+    @Auth([])
+    @ApiOperation({ summary: 'Update track by user' })
+    async updatetTrack(@Param('id') id: number, @CurrentUser() user: any, @Body() updateDto: UpdateTrackDto) {
+        await this.trackingService.updateTrack(id, user, updateDto)
     }
 
     @Patch(':id/status')
@@ -172,4 +181,18 @@ export class TrackingController {
     async notifyArrivals(@CurrentUser() user: any) {
         return this.trackingService.sendBranchNotifications(user);
     }
+
+    @Delete('softDelete/:id')
+    @Auth([])
+    @ApiOperation({ summary: 'remove track by owner (soft delete)' })
+    async softDeleteTrack(@Param("id") id: number, @CurrentUser() user: any) {
+        return await this.trackingService.softDeleteTrack(id, user)
+    }
+    @Delete(':id')
+    @Auth([])
+    @ApiOperation({ summary: 'remove track by owner (hard delete)' })
+    async deleteTrack(@Param("id") id: number, @CurrentUser() user: any) {
+        return await this.trackingService.deleteTrack(id, user)
+    }
+
 }

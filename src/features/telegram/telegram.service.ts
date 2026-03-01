@@ -30,7 +30,7 @@ export class TelegramService {
 
     async sendMessage(chatId: string, text: string, threadId?: number): Promise<boolean> {
         try {
-            const url = `https://api.telegram.org/bot${this.botToken}/sendMessage`;
+            const url = `https://api.telegram.org/bot${this.botToken}/sendMessage`
             const payload: any = {
                 chat_id: chatId,
                 text,
@@ -59,12 +59,11 @@ export class TelegramService {
     }
 
     async getSettings(): Promise<{ pricePerKg: number; dollarRate: number }> {
-        const priceSetting = await this.settingsRepo.findOne({ where: { key: 'PRICE_PER_KG' } });
-        const rateSetting = await this.settingsRepo.findOne({ where: { key: 'DOLLAR_RATE' } });
+        const settings = await this.settingsRepo.findOne({ where: { id: 1 } });
 
         return {
-            pricePerKg: priceSetting ? parseFloat(priceSetting.value) : 4,
-            dollarRate: rateSetting ? parseFloat(rateSetting.value) : 500,
+            pricePerKg: settings?.pricePerKg ?? 4,
+            dollarRate: settings?.courseUSD ?? 500,
         };
     }
 
@@ -77,7 +76,6 @@ export class TelegramService {
 
         const globalChatId = this.configService.getOrThrow('TELEGRAM_CHAT_ID');
 
-        // Find all items that need notification (Arrived at branch AND not yet notified)
         const items = await this.trackingRepo.find({
             where: {
                 branchId: branchId,
@@ -88,7 +86,6 @@ export class TelegramService {
 
         if (items.length === 0) return { usersNotified: 0, itemsNotified: 0 };
 
-        // Group by user
         const userGroups = new Map<number, TrackingItemEntity[]>();
         items.forEach(item => {
             const list = userGroups.get(item.createdByUserId) || [];
@@ -108,7 +105,6 @@ export class TelegramService {
             const success = await this.sendMessage(globalChatId, message, branch.telegramThreadId);
 
             if (success) {
-                // Mark items as notified
                 await this.trackingRepo.update(
                     userItems.map(i => i.id),
                     { isTelegramNotified: true }
@@ -138,8 +134,8 @@ export class TelegramService {
         items.forEach((item, idx) => {
             const w = item.weight ? Number(item.weight) : 0;
             totalWeight += w;
-            const weightStr = w > 0 ? `${w} кг` : 'салмағы белгісіз';
-            lines.push(`${idx + 1}. <b>${item.trackingCode}</b> — ${item.description} — ${weightStr}`);
+            const weightStr = w > 0 ? `${w} кг` : 'вес неизвестен';
+            lines.push(`${idx + 1}. <b>${item.trackingCode}</b> — ${weightStr}`);
         });
 
         const costUsd = (totalWeight * pricePerKg).toFixed(1);
@@ -148,12 +144,12 @@ export class TelegramService {
         return [
             `📦 ${mention} (${userCode})`,
             ``,
-            `Сіздің тауарларыңыз филиалға жетті:`,
+            `Ваши товары прибыли в филиал:`,
             ``,
             ...lines,
             ``,
-            `📊 Жалпы: <b>${items.length}</b> тауар, <b>${totalWeight.toFixed(1)}</b> кг`,
-            `💰 Құны: ${totalWeight.toFixed(1)} × $${pricePerKg} = <b>$${costUsd}</b> (≈ ${costTenge.toLocaleString()} ₸)`,
+            `📊 Всего: <b>${items.length}</b> товаров, <b>${totalWeight.toFixed(1)}</b> кг`,
+            `💰 Стоимость: ${totalWeight.toFixed(1)} × $${pricePerKg} = <b>$${costUsd}</b> (≈ ${costTenge.toLocaleString()} ₸)`,
             ``,
             `📍 ${branch.name}`,
         ].join('\n');

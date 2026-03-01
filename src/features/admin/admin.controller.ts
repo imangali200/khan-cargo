@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, NotFoundException, Param, Patch, Post, Query } from '@nestjs/common';
 import { AdminService } from './admin.service';
 import { Auth } from 'src/core/decorators/auth.decorators';
 import { UserRoles } from 'src/core/db/enums/user_roles';
@@ -11,6 +11,7 @@ import { ResetPasswordDto } from "./dto/reset_password.dto";
 import { InjectRepository } from "@nestjs/typeorm";
 import { SettingsEntity } from "src/core/db/entities/settings.entity";
 import { Repository } from "typeorm";
+import { SettingsAdminDto } from './dto/update_settings';
 
 @Controller('admin')
 @ApiTags('Admin - User Management')
@@ -88,16 +89,13 @@ export class AdminController {
     return this.settingsRepo.find();
   }
 
-  @Patch('settings/:key')
+  @Patch('settings/:id')
   @Auth([UserRoles.SUPERADMIN])
   @ApiOperation({ summary: 'Update global setting' })
-  async updateSetting(@Param('key') key: string, @Body('value') value: string) {
-    let setting = await this.settingsRepo.findOne({ where: { key } });
-    if (!setting) {
-      setting = this.settingsRepo.create({ key, value });
-    } else {
-      setting.value = value;
-    }
-    return this.settingsRepo.save(setting);
+  async updateSetting(@Param('id') id: number, @Body() settingDto: SettingsAdminDto) {
+    const setting = await this.settingsRepo.findOne({ where: { id } })
+    if (!setting) throw new NotFoundException('Настройки не найдены')
+    const update = await this.settingsRepo.merge(setting, settingDto)
+    return this.settingsRepo.save(update);
   }
 }

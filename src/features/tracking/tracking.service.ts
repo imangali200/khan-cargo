@@ -12,6 +12,7 @@ import { UpdateStatusDto } from "./dto/update-status.dto";
 import { TrackingFilterDto } from "./dto/tracking-filter.dto";
 import { QuickUpdateDto } from "./dto/quick-update.dto";
 import { TelegramService } from "../telegram/telegram.service";
+import { UpdateTrackDto } from "./dto/update-tracking.dto";
 
 @Injectable()
 export class TrackingService {
@@ -26,19 +27,18 @@ export class TrackingService {
     ) { }
 
     async create(dto: CreateTrackingDto, user: any): Promise<TrackingItemEntity> {
-        // Automatically take branchId from user profile
+
         const userBranchId = user.branchId;
 
         const exists = await this.trackingRepo.findOne({ where: { trackingCode: dto.trackingCode } });
-        if (exists) throw new ConflictException('Tracking code already exists');
+        if (exists) throw new ConflictException('Трек-код уже существует');
 
-        // Check master list for existing data
         const masterTrack = await this.importedTrackRepo.findOne({ where: { trackingCode: dto.trackingCode } });
 
         let initialStatus = TrackingStatus.REGISTERED;
         if (masterTrack) {
             if (masterTrack.deliveryDate) initialStatus = TrackingStatus.PICKED_UP;
-            else if (masterTrack.aicargoArrivalDate) initialStatus = TrackingStatus.ARRIVED_BRANCH;
+            else if (masterTrack.khanCargoArrivalDate) initialStatus = TrackingStatus.ARRIVED_BRANCH;
             else if (masterTrack.chinaArrivalDate) initialStatus = TrackingStatus.ARRIVED_CHINA_WAREHOUSE;
         }
 
@@ -48,7 +48,7 @@ export class TrackingService {
             createdByUserId: user.sub,
             currentStatus: initialStatus,
             chinaArrivalDate: masterTrack?.chinaArrivalDate,
-            aicargoArrivalDate: masterTrack?.aicargoArrivalDate,
+            khanCargoArrivalDate: masterTrack?.khanCargoArrivalDate,
             deliveryDate: masterTrack?.deliveryDate,
         });
         const saved = await this.trackingRepo.save(item);
@@ -111,7 +111,7 @@ export class TrackingService {
         }
 
         const item = await qb.getOne();
-        if (!item) throw new NotFoundException('Tracking item not found');
+        if (!item) throw new NotFoundException('Трек не найден');
         return item;
     }
 
@@ -120,21 +120,19 @@ export class TrackingService {
             where: { trackingCode },
             relations: ['branch', 'statusHistory'],
         });
-        if (!item) throw new NotFoundException('Tracking item not found');
+        if (!item) throw new NotFoundException('Трек не найден');
         return item;
     }
 
     async updateStatus(id: number, dto: UpdateStatusDto, user: any, branchId?: number): Promise<TrackingItemEntity> {
         const item = await this.findOne(id, branchId);
 
-        // ADMIN can only set READY_FOR_PICKUP or PICKED_UP
         if (user.role === UserRoles.ADMIN && !ADMIN_ALLOWED_STATUSES.includes(dto.status)) {
-            throw new ForbiddenException(`Admin can only set status to: ${ADMIN_ALLOWED_STATUSES.join(', ')}`);
+            throw new ForbiddenException(`Администратор может устанавливать только статусы: ${ADMIN_ALLOWED_STATUSES.join(', ')}`);
         }
 
-        // Prevent backward transitions
         if (STATUS_ORDER[dto.status] <= STATUS_ORDER[item.currentStatus]) {
-            throw new BadRequestException(`Cannot change status from ${item.currentStatus} to ${dto.status} (backward transition)`);
+            throw new BadRequestException(`Невозможно изменить статус с ${item.currentStatus} на ${dto.status} (обратный переход)`);
         }
 
         const prevStatus = item.currentStatus;
@@ -184,8 +182,8 @@ export class TrackingService {
                     item.chinaArrivalDate = master.chinaArrivalDate;
                     changed = true;
                 }
-                if (master.aicargoArrivalDate && !item.aicargoArrivalDate) {
-                    item.aicargoArrivalDate = master.aicargoArrivalDate;
+                if (master.khanCargoArrivalDate && !item.khanCargoArrivalDate) {
+                    item.khanCargoArrivalDate = master.khanCargoArrivalDate;
                     changed = true;
                 }
                 if (master.deliveryDate && !item.deliveryDate) {
@@ -208,16 +206,15 @@ export class TrackingService {
             relations: ['branch']
         });
 
-        if (!item) throw new NotFoundException(`Tracking item with code ${dto.trackingCode} is not found`);
+        if (!item) throw new NotFoundException(`Трек-код ${dto.trackingCode} не найден`);
 
         let prevStatus = item.currentStatus;
-        const targetStatus = dto.status || TrackingStatus.ARRIVED_BRANCH;
+        const targetStatus = TrackingStatus.ARRIVED_BRANCH;
 
         if (dto.weight !== undefined) {
             item.weight = dto.weight;
         }
 
-        // Only update status if it's a forward transition
         if (STATUS_ORDER[targetStatus] > STATUS_ORDER[item.currentStatus]) {
             item.currentStatus = targetStatus;
         }
@@ -246,8 +243,43 @@ export class TrackingService {
 
     async sendBranchNotifications(user: any) {
         if (!user.branchId) {
-            throw new BadRequestException('Admin is not assigned to any branch');
+            throw new BadRequestException('Администратор не привязан к складу');
         }
         return this.telegramService.notifyAllBranchArrivals(user.branchId);
+    }
+    async updateTrack(id: number, user: any, updateTrackDto: UpdateTrackDto) {
+        const track = await this.trackingRepo.findOne({
+            where: {
+                createdByUserId: user.sub,
+                id: id
+            }
+        })
+        if (!track) throw new NotFoundException('Трек с таким ID не найден')
+
+        const updateTrack = await this.trackingRepo.merge(track, updateTrackDto)
+        return this.trackingRepo.save(updateTrack)
+    }
+
+    async softDeleteTrack(id: number, user: any) {
+        const track = await this.trackingRepo.findOne({
+            where: {
+                id: id,
+                createdByUserId: user.sub
+            }
+        })
+        if (!track) throw new NotFoundException('Трек не найден')
+
+        return await this.trackingRepo.softDelete(id)
+    }
+    async deleteTrack(id: number, user: any) {
+        const track = await this.trackingRepo.findOne({
+            where: {
+                id: id,
+                createdByUserId: user.sub
+            }
+        })
+        if (!track) throw new NotFoundException('Трек не найден')
+
+        return await this.trackingRepo.delete(id)
     }
 }

@@ -15,14 +15,6 @@ export class PostEntity extends BaseCustomEntity {
     @JoinColumn({ name: 'authorId' })
     author: UserEntity;
 
-    @Column()
-    @Index()
-    branchId: number;
-
-    @ManyToOne(() => BranchEntity)
-    @JoinColumn({ name: 'branchId' })
-    branch: BranchEntity;
-
     @Column('text')
     @ApiProperty({ example: 'Новая партия товаров прибыла!' })
     @IsString()
@@ -31,6 +23,12 @@ export class PostEntity extends BaseCustomEntity {
     @Column({ length: 500, nullable: true })
     @ApiProperty({ required: false })
     imageUrl?: string;
+
+    @Column({ length: 255, nullable: true })
+    @ApiProperty({ required: false })
+    @IsString()
+    @IsOptional()
+    imagePublicId?: string;
 
     @Column({ length: 500, nullable: true })
     @ApiProperty({ required: false })
@@ -51,10 +49,6 @@ export class PostEntity extends BaseCustomEntity {
     @Column({ default: 0 })
     @ApiProperty({ example: 0 })
     commentsCount: number;
-
-    @Column({ default: false })
-    @ApiProperty({ example: false })
-    isHidden: boolean;
 
     @DeleteDateColumn()
     deletedAt?: Date;

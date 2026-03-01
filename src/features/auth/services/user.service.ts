@@ -18,11 +18,11 @@ export class UserService {
             where: { id: userId },
             relations: ['branch']
         });
-        if (!user) throw new NotFoundException('User is not found');
+        if (!user) throw new NotFoundException('Пользователь не найден');
         return user;
     }
 
-    async findAllUsers(page = 1, limit = 20, search?: string) {
+    async findAllUsers(page: number, limit: number, search?: string) {
         const qb = this.userRepository.createQueryBuilder('user')
             .leftJoinAndSelect('user.branch', 'branch');
 
@@ -50,18 +50,15 @@ export class UserService {
     }
 
     async createUser(createDto: CreateUserDto): Promise<UserEntity> {
-        // Check phone number
         const phoneExists = await this.userRepository.findOne({ where: { phoneNumber: createDto.phoneNumber } });
-        if (phoneExists) throw new ConflictException('User with this phone number already exists');
+        if (phoneExists) throw new ConflictException('Пользователь с таким номером телефона уже существует');
 
-        // Check user code
         const codeExists = await this.userRepository.findOne({ where: { userCode: createDto.userCode } });
-        if (codeExists) throw new ConflictException(`User with code ${createDto.userCode} already exists`);
+        if (codeExists) throw new ConflictException(`Пользователь с кодом ${createDto.userCode} уже существует`);
 
-        // Check telegram username if provided
         if (createDto.telegramUsername) {
             const usernameExists = await this.userRepository.findOne({ where: { telegramUsername: createDto.telegramUsername } });
-            if (usernameExists) throw new ConflictException('User with this Telegram username already exists');
+            if (usernameExists) throw new ConflictException('Пользователь с таким Telegram ником уже существует');
         }
 
         const hashPassword = await bcrypt.hash(createDto.password, 10);
@@ -74,7 +71,7 @@ export class UserService {
 
     async updateUser(userId: number, updateDto: UpdateUserDto): Promise<UserEntity> {
         const user = await this.userRepository.findOne({ where: { id: userId } });
-        if (!user) throw new NotFoundException('User is not found');
+        if (!user) throw new NotFoundException('Пользователь не найден');
 
         const merged = this.userRepository.merge(user, updateDto);
         return await this.userRepository.save(merged);
@@ -82,7 +79,7 @@ export class UserService {
 
     async resetPassword(userId: number, newPassword: string): Promise<{ message: string }> {
         const user = await this.userRepository.findOne({ where: { id: userId } });
-        if (!user) throw new NotFoundException('User is not found');
+        if (!user) throw new NotFoundException('Пользователь не найден');
 
         user.password = await bcrypt.hash(newPassword, 10);
         await this.userRepository.save(user);
@@ -91,13 +88,19 @@ export class UserService {
 
     async deletedUser(userId: number) {
         const user = await this.userRepository.findOne({ where: { id: userId } });
-        if (!user) throw new NotFoundException('User is not found');
+        if (!user) throw new NotFoundException('Пользователь не найден');
         return await this.userRepository.softDelete(userId);
     }
 
     async toggleUserStatus(userId: number): Promise<UserEntity> {
         const user = await this.findUser(userId);
         user.isActive = !user.isActive;
+        return await this.userRepository.save(user);
+    }
+    async updateProfilePhoto(userId: number, photoUrl: string, publicId: string): Promise<UserEntity> {
+        const user = await this.findUser(userId);
+        user.profilePhotoUrl = photoUrl;
+        user.profilePhotoPublicId = publicId;
         return await this.userRepository.save(user);
     }
 }

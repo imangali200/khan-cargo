@@ -10,11 +10,15 @@ import { TokenService } from './services/token.service';
 import { UserService } from './services/user.service';
 import { PassportModule } from '@nestjs/passport';
 import { JwtStrategy } from './strategies/jwt.strategies';
+import { UserController } from './controllers/user.contoller';
+
+import { UploadModule } from '../upload/upload.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([UserEntity, BranchEntity]),
     PassportModule,
+    UploadModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -23,7 +27,7 @@ import { JwtStrategy } from './strategies/jwt.strategies';
       })
     })
   ],
-  controllers: [AuthController],
+  controllers: [AuthController, UserController],
   providers: [AuthService, TokenService, UserService, JwtStrategy],
   exports: [UserService, AuthService]
 })

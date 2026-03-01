@@ -35,5 +35,5 @@ export class CreateUserDto {
     @IsString()
     @IsOptional()
     @ApiProperty({ example: '@username', required: false })
-    telegramUsername?: string;
+    telegramUsername: string;
 }

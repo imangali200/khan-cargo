@@ -19,7 +19,7 @@ export class ImportedTrackEntity extends BaseCustomEntity {
     @Column({ type: 'timestamptz', nullable: true })
     @ApiProperty({ required: false })
     @IsOptional()
-    aicargoArrivalDate?: Date;
+    khanCargoArrivalDate?: Date;
 
     @Column({ type: 'timestamptz', nullable: true })
     @ApiProperty({ required: false })

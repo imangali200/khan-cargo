@@ -13,13 +13,16 @@ export class UploadService {
         });
     }
 
-    async uploadImage(file: Express.Multer.File): Promise<string> {
+    async uploadImage(file: Express.Multer.File): Promise<{ url: string; publicId: string }> {
         return new Promise((resolve, reject) => {
             const uploadStream = cloudinary.uploader.upload_stream(
                 { folder: 'khan-cargo-posts' },
                 (error, result: UploadApiResponse) => {
                     if (error) return reject(error);
-                    resolve(result.secure_url);
+                    resolve({
+                        url: result.secure_url,
+                        publicId: result.public_id,
+                    });
                 },
             );
 
@@ -27,6 +30,15 @@ export class UploadService {
             stream.push(file.buffer);
             stream.push(null);
             stream.pipe(uploadStream);
+        });
+    }
+
+    async deleteImage(publicId: string): Promise<any> {
+        return new Promise((resolve, reject) => {
+            cloudinary.uploader.destroy(publicId, (error, result) => {
+                if (error) return reject(error);
+                resolve(result);
+            });
         });
     }
 }

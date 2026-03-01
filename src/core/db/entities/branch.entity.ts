@@ -11,7 +11,6 @@ export class BranchEntity extends BaseCustomEntity {
     @IsString()
     name: string;
 
-
     @Column({ default: true })
     @ApiProperty({ example: true })
     @IsBoolean()

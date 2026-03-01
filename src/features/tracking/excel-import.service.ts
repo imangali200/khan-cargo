@@ -45,15 +45,11 @@ export class ExcelImportService {
         targetStatus: TrackingStatus,
         userId: number,
     ): Promise<ImportResult> {
-        // Parse Excel
         const workbook = XLSX.read(file.buffer, { type: 'buffer' });
         const sheet = workbook.Sheets[workbook.SheetNames[0]];
 
-        // Get raw data (array of arrays)
         const rawRows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1 });
 
-        // Extract tracking codes from the first column (A)
-        // We skip empty rows and potentially skip the header row if it contains keywords
         const uniqueCodes = [...new Set(
             rawRows
                 .map(row => (row && row.length > 0 ? String(row[0]).trim() : ''))
@@ -78,69 +74,53 @@ export class ExcelImportService {
         const skipped: { code: string; reason: string }[] = [];
 
         for (const code of uniqueCodes) {
-            const item = itemMap.get(code);
+            try {
+                // 1. Update/Create Master List (ImportedTrackEntity)
+                let masterTrack = await this.importedTrackRepo.findOne({ where: { trackingCode: code } });
+                if (!masterTrack) {
+                    masterTrack = this.importedTrackRepo.create({ trackingCode: code });
+                }
 
-            if (!item) {
-                errors.push({ code, reason: 'NOT_FOUND' });
-                continue;
+                // Sync dates based on target status for master track
+                if (targetStatus === TrackingStatus.ARRIVED_CHINA_WAREHOUSE) masterTrack.chinaArrivalDate = new Date();
+                if (targetStatus === TrackingStatus.ARRIVED_BRANCH) masterTrack.khanCargoArrivalDate = new Date();
+                if (targetStatus === TrackingStatus.PICKED_UP) masterTrack.deliveryDate = new Date();
+
+                await this.importedTrackRepo.save(masterTrack);
+
+                // 2. Update existing Registered Item (TrackingItemEntity) if found
+                const item = itemMap.get(code);
+                if (item) {
+                    // Check if already at same or later status
+                    if (STATUS_ORDER[item.currentStatus] >= STATUS_ORDER[targetStatus]) {
+                        skipped.push({ code, reason: `ALREADY_AT_STATUS_${item.currentStatus}` });
+                        // We still count it as master-success, but skip the item update
+                    } else {
+                        const prevStatus = item.currentStatus;
+                        item.currentStatus = targetStatus;
+
+                        // Sync dates from master track
+                        if (targetStatus === TrackingStatus.ARRIVED_CHINA_WAREHOUSE) item.chinaArrivalDate = masterTrack.chinaArrivalDate;
+                        if (targetStatus === TrackingStatus.ARRIVED_BRANCH) item.khanCargoArrivalDate = masterTrack.khanCargoArrivalDate;
+                        if (targetStatus === TrackingStatus.PICKED_UP) item.deliveryDate = masterTrack.deliveryDate;
+
+                        await this.trackingRepo.save(item);
+
+                        await this.statusHistoryRepo.save({
+                            trackingItemId: item.id,
+                            previousStatus: prevStatus,
+                            newStatus: targetStatus,
+                            changedByUserId: userId,
+                            source: StatusSource.EXCEL_IMPORT,
+                        });
+                    }
+                }
+
+                success.push(code);
+            } catch (err) {
+                this.logger.error(`Error processing code ${code}: ${err.message}`);
+                errors.push({ code, reason: 'INTERNAL_ERROR' });
             }
-
-            // Check if already at same or later status
-            if (STATUS_ORDER[item.currentStatus] >= STATUS_ORDER[targetStatus]) {
-                skipped.push({ code, reason: `ALREADY_AT_STATUS_${item.currentStatus}` });
-                continue;
-            }
-
-            // Branch validation for ARRIVED_BRANCH
-            // Note: If we need branchId from Excel in the future, we can add it back
-            // focusing on a specific column (e.g. column B)
-            if (targetStatus === TrackingStatus.ARRIVED_BRANCH) {
-                // For now, if user only provides codes in A1, we skip branch matching
-            }
-
-            const prevStatus = item.currentStatus;
-            item.currentStatus = targetStatus;
-
-            // Sync dates based on status
-            if (targetStatus === TrackingStatus.ARRIVED_CHINA_WAREHOUSE) item.chinaArrivalDate = new Date();
-            if (targetStatus === TrackingStatus.ARRIVED_BRANCH) item.aicargoArrivalDate = new Date();
-            if (targetStatus === TrackingStatus.PICKED_UP) item.deliveryDate = new Date();
-
-            await this.trackingRepo.save(item);
-
-            // Update master list (ImportedTrackEntity)
-            let masterTrack = await this.importedTrackRepo.findOne({ where: { trackingCode: code } });
-            if (!masterTrack) {
-                masterTrack = this.importedTrackRepo.create({ trackingCode: code });
-            }
-            if (targetStatus === TrackingStatus.ARRIVED_CHINA_WAREHOUSE) masterTrack.chinaArrivalDate = new Date();
-            if (targetStatus === TrackingStatus.ARRIVED_BRANCH) masterTrack.aicargoArrivalDate = new Date();
-            if (targetStatus === TrackingStatus.PICKED_UP) masterTrack.deliveryDate = new Date();
-            await this.importedTrackRepo.save(masterTrack);
-
-            await this.statusHistoryRepo.save({
-                trackingItemId: item.id,
-                previousStatus: prevStatus,
-                newStatus: targetStatus,
-                changedByUserId: userId,
-                source: StatusSource.EXCEL_IMPORT,
-            });
-
-            success.push(code);
-        }
-
-        // Final step: Handle codes NOT found in TrackingItemEntity but present in Excel
-        // These should still be added to the master list (ImportedTrackEntity)
-        const missingCodes = uniqueCodes.filter(c => !itemMap.has(c));
-        for (const code of missingCodes) {
-            let masterTrack = await this.importedTrackRepo.findOne({ where: { trackingCode: code } });
-            if (!masterTrack) {
-                masterTrack = this.importedTrackRepo.create({ trackingCode: code });
-            }
-            if (targetStatus === TrackingStatus.ARRIVED_CHINA_WAREHOUSE) masterTrack.chinaArrivalDate = new Date();
-            if (targetStatus === TrackingStatus.ARRIVED_BRANCH) masterTrack.aicargoArrivalDate = new Date();
-            if (targetStatus === TrackingStatus.PICKED_UP) masterTrack.deliveryDate = new Date();
-            await this.importedTrackRepo.save(masterTrack);
         }
 
         // Save import log
@@ -169,7 +149,7 @@ export class ExcelImportService {
         };
     }
 
-    async getImportLogs(page = 1, limit = 20) {
+    async getImportLogs(page: number, limit: number) {
         const [data, total] = await this.importLogRepo.findAndCount({
             relations: ['uploadedBy'],
             order: { createdAt: 'DESC' },
@@ -182,7 +162,7 @@ export class ExcelImportService {
         };
     }
 
-    async findMasterItems(page = 1, limit = 20) {
+    async findMasterItems(page:number, limit:number) {
         const [data, total] = await this.importedTrackRepo.findAndCount({
             order: { createdAt: 'DESC' },
             skip: (page - 1) * limit,
@@ -196,7 +176,7 @@ export class ExcelImportService {
 
     async searchMasterItems(trackingCode: string) {
         return this.importedTrackRepo.find({
-            where: { trackingCode: In([trackingCode]) }, // Using exact match for now, can be ILIKE
+            where: { trackingCode: In([trackingCode]) },
         });
     }
 
@@ -207,18 +187,17 @@ export class ExcelImportService {
         }
 
         if (targetStatus === TrackingStatus.ARRIVED_CHINA_WAREHOUSE) masterTrack.chinaArrivalDate = new Date();
-        if (targetStatus === TrackingStatus.ARRIVED_BRANCH) masterTrack.aicargoArrivalDate = new Date();
+        if (targetStatus === TrackingStatus.ARRIVED_BRANCH) masterTrack.khanCargoArrivalDate = new Date();
         if (targetStatus === TrackingStatus.PICKED_UP) masterTrack.deliveryDate = new Date();
 
         await this.importedTrackRepo.save(masterTrack);
 
-        // Also update existing user items
         const userItems = await this.trackingRepo.find({ where: { trackingCode } });
         for (const item of userItems) {
             const prevStatus = item.currentStatus;
             item.currentStatus = targetStatus;
             if (targetStatus === TrackingStatus.ARRIVED_CHINA_WAREHOUSE) item.chinaArrivalDate = masterTrack.chinaArrivalDate;
-            if (targetStatus === TrackingStatus.ARRIVED_BRANCH) item.aicargoArrivalDate = masterTrack.aicargoArrivalDate;
+            if (targetStatus === TrackingStatus.ARRIVED_BRANCH) item.khanCargoArrivalDate = masterTrack.khanCargoArrivalDate;
             if (targetStatus === TrackingStatus.PICKED_UP) item.deliveryDate = masterTrack.deliveryDate;
             await this.trackingRepo.save(item);
 

@@ -18,16 +18,14 @@ export class BranchScopeGuard implements CanActivate {
         const request = context.switchToHttp().getRequest();
         const user = request.user;
 
-        // SUPERADMIN bypasses branch scope
         if (user.role === UserRoles.SUPERADMIN) return true;
 
-        // For ADMIN/USER: check branch match and inject scope
+
         const paramBranchId = Number(request.params.branchId || request.query.branchId);
         if (paramBranchId && paramBranchId !== user.branchId) {
-            throw new ForbiddenException('Access denied: branch scope violation');
+            throw new ForbiddenException('Доступ запрещен: не тот склад');
         }
 
-        // Auto-set branchId scope for downstream use
         request.branchIdScope = user.branchId;
         return true;
     }

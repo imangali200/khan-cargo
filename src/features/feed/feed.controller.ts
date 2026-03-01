@@ -1,6 +1,6 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UploadedFile, UseInterceptors } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
-import { ApiOperation, ApiQuery, ApiTags } from "@nestjs/swagger";
+import { ApiBody, ApiConsumes, ApiOperation, ApiQuery, ApiTags } from "@nestjs/swagger";
 import { Auth } from "src/core/decorators/auth.decorators";
 import { CurrentUser } from "src/core/decorators/current-user.decorator";
 import { UserRoles } from "src/core/db/enums/user_roles";
@@ -18,7 +18,7 @@ export class FeedController {
     ) { }
 
     @Get()
-    @Auth([UserRoles.USER, UserRoles.ADMIN, UserRoles.SUPERADMIN])
+    @Auth([])
     @ApiOperation({ summary: 'Get feed (branch-scoped, SUPERADMIN sees all)' })
     @ApiQuery({ name: 'page', required: false, example: 1 })
     @ApiQuery({ name: 'limit', required: false, example: 20 })
@@ -33,6 +33,21 @@ export class FeedController {
     @Post('posts')
     @Auth([UserRoles.USER, UserRoles.ADMIN, UserRoles.SUPERADMIN])
     @UseInterceptors(FileInterceptor('image'))
+    @ApiConsumes('multipart/form-data')
+    @ApiBody({
+        schema: {
+            type: 'object',
+            properties: {
+                content: { type: 'string' },
+                externalLink: { type: 'string' },
+                price: { type: 'number' },
+                image: {
+                    type: 'string',
+                    format: 'binary',
+                },
+            },
+        },
+    })
     @ApiOperation({ summary: 'Create post' })
     async createPost(
         @Body() dto: CreatePostDto,
@@ -40,16 +55,18 @@ export class FeedController {
         @UploadedFile() file?: Express.Multer.File,
     ) {
         if (file) {
-            dto.imageUrl = await this.uploadService.uploadImage(file);
+            const { url, publicId } = await this.uploadService.uploadImage(file);
+            dto.imageUrl = url;
+            dto.imagePublicId = publicId;
         }
         return this.feedService.createPost(dto, user);
     }
 
-    @Get('posts/:id')
+    @Get('posts/:search')
     @Auth([UserRoles.USER, UserRoles.ADMIN, UserRoles.SUPERADMIN])
     @ApiOperation({ summary: 'Get post by ID' })
-    async getPost(@Param('id') id: number) {
-        return this.feedService.getPost(id);
+    async getPost(@Param('search') search: string) {
+        return this.feedService.getPost(search);
     }
 
     @Delete('posts/:id')
@@ -66,14 +83,6 @@ export class FeedController {
         return this.feedService.toggleLike(id, userId);
     }
 
-    @Patch('posts/:id/hide')
-    @Auth([UserRoles.ADMIN, UserRoles.SUPERADMIN])
-    @ApiOperation({ summary: 'Toggle hide/show post (moderation — branch admin or superadmin)' })
-    async hidePost(@Param('id') id: number, @CurrentUser() user: any) {
-        return this.feedService.hidePost(id, user);
-    }
-
-    // --- Comments ---
 
     @Get('posts/:postId/comments')
     @Auth([UserRoles.USER, UserRoles.ADMIN, UserRoles.SUPERADMIN])
@@ -98,8 +107,8 @@ export class FeedController {
     }
 
     @Delete('comments/:id')
-    @Auth([UserRoles.USER, UserRoles.ADMIN, UserRoles.SUPERADMIN])
-    @ApiOperation({ summary: 'Delete comment (author, branch admin, or superadmin)' })
+    @Auth([UserRoles.USER, UserRoles.SUPERADMIN])
+    @ApiOperation({ summary: 'Delete comment (author, or superadmin)' })
     async deleteComment(@Param('id') id: number, @CurrentUser() user: any) {
         return this.feedService.deleteComment(id, user);
     }

@@ -1,7 +1,7 @@
 import { ApiProperty } from "@nestjs/swagger";
 import { IsEnum, IsNumber, IsOptional, IsString } from "class-validator";
 import { BaseCustomEntity } from "src/core/base/entity/base.entity";
-import { Column, Entity, Index, JoinColumn, ManyToOne, OneToMany } from "typeorm";
+import { Column, DeleteDateColumn, Entity, Index, JoinColumn, ManyToOne, OneToMany } from "typeorm";
 import { TrackingStatus } from "../enums/tracking-status.enum";
 import { BranchEntity } from "./branch.entity";
 import { UserEntity } from "./user.entity";
@@ -46,19 +46,6 @@ export class TrackingItemEntity extends BaseCustomEntity {
     @Index()
     currentStatus: TrackingStatus;
 
-    @Column({ length: 100, nullable: true })
-    @ApiProperty({ example: 'Асет', required: false })
-    @IsString()
-    @IsOptional()
-    clientName?: string;
-
-    @Column({ length: 20, nullable: true })
-    @ApiProperty({ example: '87051112233', required: false })
-    @IsString()
-    @IsOptional()
-    @Index()
-    clientPhone?: string;
-
     @Column('decimal', { precision: 10, scale: 2, nullable: true })
     @ApiProperty({ example: 2.5, required: false })
     @IsOptional()
@@ -77,7 +64,7 @@ export class TrackingItemEntity extends BaseCustomEntity {
     @Column({ type: 'timestamptz', nullable: true })
     @ApiProperty({ required: false })
     @IsOptional()
-    aicargoArrivalDate?: Date;
+    khanCargoArrivalDate?: Date;
 
     @Column({ type: 'timestamptz', nullable: true })
     @ApiProperty({ required: false })
@@ -90,4 +77,7 @@ export class TrackingItemEntity extends BaseCustomEntity {
 
     @OneToMany(() => StatusHistoryEntity, (sh) => sh.trackingItem)
     statusHistory: StatusHistoryEntity[];
+
+    @DeleteDateColumn()
+    deletedAt?: Date;
 }

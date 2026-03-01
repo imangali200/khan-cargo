@@ -7,10 +7,6 @@ export class QuickUpdateDto {
     @ApiProperty({ example: 'KH-20260219-001' })
     trackingCode: string;
 
-    @IsEnum(TrackingStatus)
-    @IsOptional()
-    @ApiProperty({ enum: TrackingStatus, required: false })
-    status?: TrackingStatus;
 
     @IsNumber()
     @IsOptional()

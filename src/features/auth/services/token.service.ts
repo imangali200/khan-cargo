@@ -44,7 +44,7 @@ export class TokenService {
                 secret: this.configService.getOrThrow<string>('JWT_SECRET')
             });
         } catch (error) {
-            throw new UnauthorizedException('Invalid or expired refresh token');
+            throw new UnauthorizedException('Серссия истекла, авторизуйтесь заново');
         }
         const user = await this.userService.findUser(payload.sub);
         return await this.createToken(user);

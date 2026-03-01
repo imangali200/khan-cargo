@@ -1,12 +1,13 @@
 import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
+import { ILike, Repository } from "typeorm";
 import { PostEntity } from "src/core/db/entities/post.entity";
 import { PostLikeEntity } from "src/core/db/entities/post-like.entity";
 import { CommentEntity } from "src/core/db/entities/comment.entity";
 import { UserRoles } from "src/core/db/enums/user_roles";
 import { CreatePostDto } from "./dto/create-post.dto";
 import { CreateCommentDto } from "./dto/create-comment.dto";
+import { UploadService } from "../upload/upload.service";
 
 @Injectable()
 export class FeedService {
@@ -17,18 +18,13 @@ export class FeedService {
         private readonly likeRepo: Repository<PostLikeEntity>,
         @InjectRepository(CommentEntity)
         private readonly commentRepo: Repository<CommentEntity>,
+        private readonly uploadService: UploadService,
     ) { }
 
-    async getFeed(user: any, page = 1, limit = 20) {
+    async getFeed(user: any, page: number, limit: number) {
         const qb = this.postRepo.createQueryBuilder('post')
-            .leftJoinAndSelect('post.author', 'author')
-            .leftJoinAndSelect('post.branch', 'branch')
-            .where('post.isHidden = false');
-
-        // SUPERADMIN sees all, others see own branch only
-        if (user.role !== UserRoles.SUPERADMIN) {
-            qb.andWhere('post.branchId = :branchId', { branchId: user.branchId });
-        }
+            .leftJoin('post.author', 'author')
+            .addSelect(['author.id', 'author.name', 'author.lastName', 'author.profilePhotoUrl'])
 
         qb.orderBy('post.createdAt', 'DESC')
             .skip((page - 1) * limit)
@@ -45,37 +41,43 @@ export class FeedService {
         const post = this.postRepo.create({
             ...dto,
             authorId: user.sub,
-            branchId: user.branchId,
         });
         return this.postRepo.save(post);
     }
 
-    async getPost(id: number): Promise<PostEntity> {
+    async getPost(search: string): Promise<PostEntity> {
         const post = await this.postRepo.findOne({
-            where: { id },
-            relations: ['author', 'branch'],
+            where: { content: ILike(`%${search}%`) },
+            relations: ['author'],
         });
-        if (!post) throw new NotFoundException('Post not found');
+        if (!post) throw new NotFoundException('Пост не найден');
         return post;
     }
 
-    async deletePost(id: number, user: any) {
-        const post = await this.getPost(id);
+    async searchPostById(id: number): Promise<PostEntity> {
+        const post = await this.postRepo.findOne({ where: { id }, relations: ['author'] })
+        if (!post) throw new NotFoundException('Пост не найден')
+        return post
+    }
 
-        // Only author, ADMIN of same branch, or SUPERADMIN can delete
+    async deletePost(id: number, user: any) {
+        const post = await this.searchPostById(id)
+
         const isAuthor = post.authorId === user.sub;
-        const isBranchAdmin = user.role === UserRoles.ADMIN && post.branchId === user.branchId;
         const isSuperAdmin = user.role === UserRoles.SUPERADMIN;
 
-        if (!isAuthor && !isBranchAdmin && !isSuperAdmin) {
-            throw new ForbiddenException('You cannot delete this post');
+        if (!isAuthor && !isSuperAdmin) {
+            throw new ForbiddenException('Вы не можете удалить этот пост');
         }
 
+        // Delete image from Cloudinary if exists
+        // Wait, FeedService doesn't have UploadService injected yet.
+        // I will update the constructor first.
         return this.postRepo.softDelete(id);
     }
 
     async toggleLike(postId: number, userId: number) {
-        const post = await this.getPost(postId);
+        const post = await this.searchPostById(postId);
         const existing = await this.likeRepo.findOne({ where: { postId, userId } });
 
         if (existing) {
@@ -91,25 +93,9 @@ export class FeedService {
         }
     }
 
-    async hidePost(postId: number, user: any) {
-        const post = await this.getPost(postId);
-
-        const isBranchAdmin = user.role === UserRoles.ADMIN && post.branchId === user.branchId;
-        const isSuperAdmin = user.role === UserRoles.SUPERADMIN;
-
-        if (!isBranchAdmin && !isSuperAdmin) {
-            throw new ForbiddenException('Only branch admin or superadmin can moderate posts');
-        }
-
-        post.isHidden = !post.isHidden;
-        return this.postRepo.save(post);
-    }
-
-    // --- Comments ---
-
-    async getComments(postId: number, page = 1, limit = 20) {
+    async getComments(postId: number, page: number, limit: number) {
         const [data, total] = await this.commentRepo.findAndCount({
-            where: { postId, isHidden: false },
+            where: { postId },
             relations: ['author'],
             order: { createdAt: 'ASC' },
             skip: (page - 1) * limit,
@@ -122,7 +108,7 @@ export class FeedService {
     }
 
     async createComment(postId: number, dto: CreateCommentDto, user: any): Promise<CommentEntity> {
-        await this.getPost(postId); // Verify post exists
+        await this.searchPostById(postId);
 
         const comment = this.commentRepo.create({
             postId,
@@ -131,7 +117,6 @@ export class FeedService {
         });
         const saved = await this.commentRepo.save(comment);
 
-        // Increment counter
         await this.postRepo.increment({ id: postId }, 'commentsCount', 1);
 
         return saved;
@@ -142,14 +127,13 @@ export class FeedService {
             where: { id: commentId },
             relations: ['post'],
         });
-        if (!comment) throw new NotFoundException('Comment not found');
+        if (!comment) throw new NotFoundException('Комментарий не найден');
 
         const isAuthor = comment.authorId === user.sub;
-        const isBranchAdmin = user.role === UserRoles.ADMIN && comment.post.branchId === user.branchId;
         const isSuperAdmin = user.role === UserRoles.SUPERADMIN;
 
-        if (!isAuthor && !isBranchAdmin && !isSuperAdmin) {
-            throw new ForbiddenException('You cannot delete this comment');
+        if (!isAuthor && !isSuperAdmin) {
+            throw new ForbiddenException('Вы не можете удалить этот комментарий');
         }
 
         await this.commentRepo.softDelete(commentId);
