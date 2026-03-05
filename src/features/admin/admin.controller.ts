@@ -101,4 +101,12 @@ export class AdminController {
     const update = await this.settingsRepo.merge(setting, settingDto)
     return this.settingsRepo.save(update);
   }
+
+  @Post('settings')
+  @Auth([UserRoles.SUPERADMIN])
+  @ApiOperation({ summary: 'Create global setting if missing' })
+  async createSetting(@Body() settingDto: SettingsAdminDto) {
+    const newSetting = this.settingsRepo.create(settingDto);
+    return this.settingsRepo.save(newSetting);
+  }
 }

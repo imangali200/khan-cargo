@@ -100,7 +100,7 @@ export class TrackingController {
     }
 
     @Post('import')
-    @Auth([UserRoles.SUPERADMIN])
+    @Auth([UserRoles.ADMIN, UserRoles.SUPERADMIN])
     @UseInterceptors(FileInterceptor('file'))
     @ApiConsumes('multipart/form-data')
     @ApiBody({
@@ -124,6 +124,11 @@ export class TrackingController {
         @Body('targetStatus') targetStatus: TrackingStatus,
         @CurrentUser() user: any,
     ): Promise<any> {
+        // Validation: Admins can only import to ARRIVED_BRANCH
+        if (user.role === UserRoles.ADMIN && targetStatus !== TrackingStatus.ARRIVED_BRANCH) {
+            throw new ForbiddenException('Администраторы филиалов могут импортировать только со статусом "Принят на складе (РК)".');
+        }
+
         return this.excelImportService.processImport(file, targetStatus, user.sub);
     }
 
