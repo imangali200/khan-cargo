@@ -33,7 +33,9 @@ export class UserService {
             );
         }
 
-        qb.orderBy('user.createdAt', 'DESC')
+        qb.addSelect(`CASE "user"."role" WHEN 'superAdmin' THEN 0 WHEN 'admin' THEN 1 ELSE 2 END`, 'role_priority')
+            .orderBy('role_priority', 'ASC')
+            .addOrderBy('user.createdAt', 'DESC')
             .skip((page - 1) * limit)
             .take(limit);
 

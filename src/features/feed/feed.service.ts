@@ -1,6 +1,6 @@
 import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { ILike, Repository } from "typeorm";
+import { ILike, In, Repository } from "typeorm";
 import { PostEntity } from "src/core/db/entities/post.entity";
 import { PostLikeEntity } from "src/core/db/entities/post-like.entity";
 import { CommentEntity } from "src/core/db/entities/comment.entity";
@@ -23,14 +23,17 @@ export class FeedService {
 
     async getFeed(user: any, page: number, limit: number) {
         const qb = this.postRepo.createQueryBuilder('post')
-            .leftJoin('post.author', 'author')
-            .addSelect(['author.id', 'author.name', 'author.lastName', 'author.profilePhotoUrl'])
-
-        qb.orderBy('post.createdAt', 'DESC')
+            .leftJoinAndSelect('post.author', 'author')
+            .orderBy('post.createdAt', 'DESC')
             .skip((page - 1) * limit)
             .take(limit);
 
         const [data, total] = await qb.getManyAndCount();
+
+        if (user?.sub) {
+            await this.populateLikes(data, user.sub);
+        }
+
         return {
             data,
             meta: { page, limit, total, lastPage: Math.ceil(total / limit) },
@@ -45,13 +48,21 @@ export class FeedService {
         return this.postRepo.save(post);
     }
 
-    async getPost(search: string): Promise<PostEntity> {
-        const post = await this.postRepo.findOne({
+    async searchPosts(search: string, userId?: number) {
+        const [data, total] = await this.postRepo.findAndCount({
             where: { content: ILike(`%${search}%`) },
-            relations: ['author'],
+            relations: ['author', 'author.branch'],
+            order: { createdAt: 'DESC' },
         });
-        if (!post) throw new NotFoundException('Пост не найден');
-        return post;
+
+        if (userId) {
+            await this.populateLikes(data, userId);
+        }
+
+        return {
+            data,
+            meta: { page: 1, limit: total, total, lastPage: 1 },
+        };
     }
 
     async searchPostById(id: number): Promise<PostEntity> {
@@ -140,5 +151,22 @@ export class FeedService {
         await this.postRepo.decrement({ id: comment.postId }, 'commentsCount', 1);
 
         return { message: 'Comment deleted' };
+    }
+
+    private async populateLikes(posts: PostEntity[], userId: number) {
+        if (!posts.length) return;
+
+        const postIds = posts.map(p => p.id);
+        const userLikes = await this.likeRepo.find({
+            where: {
+                userId,
+                postId: In(postIds)
+            }
+        });
+
+        const likedPostIds = new Set(userLikes.map(l => l.postId));
+        posts.forEach(p => {
+            (p as any).isLikedByMe = likedPostIds.has(p.id);
+        });
     }
 }

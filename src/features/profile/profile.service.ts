@@ -52,6 +52,7 @@ export class ProfileService {
     async getMyPosts(userId: number, page: number, limit: number) {
         const [data, total] = await this.postRepo.findAndCount({
             where: { authorId: userId },
+            relations: ['author', 'author.branch'],
             order: { createdAt: 'DESC' },
             skip: (page - 1) * limit,
             take: limit,
@@ -60,14 +61,15 @@ export class ProfileService {
     }
 
     async getLikedPosts(userId: number, page: number, limit: number) {
-        const qb = this.postRepo.createQueryBuilder('post')
-            .innerJoin('post_like', 'like', 'like.postId = post.id AND like.userId = :userId', { userId })
-            .leftJoinAndSelect('post.author', 'author')
-            .orderBy('like.createdAt', 'DESC')
-            .skip((page - 1) * limit)
-            .take(limit);
+        const [likes, total] = await this.likeRepo.findAndCount({
+            where: { userId },
+            relations: ['post', 'post.author', 'post.author.branch'],
+            order: { createdAt: 'DESC' },
+            skip: (page - 1) * limit,
+            take: limit,
+        });
 
-        const [data, total] = await qb.getManyAndCount();
+        const data = likes.map(like => like.post);
         return { data, meta: { page, limit, total, lastPage: Math.ceil(total / limit) } };
     }
 

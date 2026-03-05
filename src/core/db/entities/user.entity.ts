@@ -27,6 +27,7 @@ export class UserEntity extends BaseCustomEntity {
     @IsOptional()
     telegramUsername?: string;
 
+
     @Column({ length: 500, nullable: true })
     @ApiProperty({ required: false })
     @IsString()

@@ -12,6 +12,11 @@ export class UpdateProfileDto {
     @ApiProperty({ example: 'Zhaksylyk', required: false })
     lastName?: string;
 
+    @IsString()
+    @IsOptional()
+    @ApiProperty({ example: '@username', required: false })
+    telegramUsername?: string;
+
     @IsEmail()
     @IsOptional()
     @ApiProperty({ example: 'user@example.com', required: false })

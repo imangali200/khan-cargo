@@ -64,9 +64,9 @@ export class FeedController {
 
     @Get('posts/:search')
     @Auth([UserRoles.USER, UserRoles.ADMIN, UserRoles.SUPERADMIN])
-    @ApiOperation({ summary: 'Get post by ID' })
-    async getPost(@Param('search') search: string) {
-        return this.feedService.getPost(search);
+    @ApiOperation({ summary: 'Search posts by content' })
+    async searchPosts(@Param('search') search: string, @CurrentUser('sub') userId: number) {
+        return this.feedService.searchPosts(search, userId);
     }
 
     @Delete('posts/:id')

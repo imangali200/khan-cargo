@@ -17,7 +17,7 @@ export class BranchService {
     ) { }
 
     async findAll(): Promise<BranchEntity[]> {
-        return this.branchRepo.find({ order: { name: 'ASC' } });
+        return this.branchRepo.find({ order: { name: 'ASC' }, relations: ['admin'] });
     }
 
     async findByName(name: string): Promise<BranchEntity[]> {
@@ -54,6 +54,12 @@ export class BranchService {
 
     async findOne(id: number) {
         const branch = await this.branchRepo.findOne({ where: { id } })
+        if (!branch) throw new NotFoundException('Склад не найден')
+        return branch
+    }
+
+    async findOneWithAdmin(id: number) {
+        const branch = await this.branchRepo.findOne({ where: { id }, relations: ['admin'] })
         if (!branch) throw new NotFoundException('Склад не найден')
         return branch
     }

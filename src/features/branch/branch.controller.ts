@@ -19,6 +19,14 @@ export class BranchController {
         return this.branchService.findAll();
     }
 
+    @Get('id/:id')
+    @Auth([UserRoles.SUPERADMIN])
+    @ApiOperation({ summary: 'Get branch by ID' })
+    @ApiResponse({ type: BranchEntity })
+    async findOneById(@Param('id') id: number): Promise<BranchEntity> {
+        return this.branchService.findOneWithAdmin(id);
+    }
+
     @Get(':name')
     @Auth([UserRoles.SUPERADMIN])
     @ApiOperation({ summary: 'Search branches by name (partial match)' })
