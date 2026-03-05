@@ -30,15 +30,18 @@ export class AdminController {
   @ApiQuery({ name: 'page', required: false, example: 1 })
   @ApiQuery({ name: 'limit', required: false, example: 20 })
   @ApiQuery({ name: 'search', required: false })
+  @ApiQuery({ name: 'role', required: false })
   async getUsers(
     @Query('page') page?: number,
     @Query('limit') limit?: number,
     @Query('search') search?: string,
+    @Query('role') role?: string,
   ) {
     return await this.userService.findAllUsers(
       page ? Number(page) : 1,
       limit ? Number(limit) : 20,
-      search
+      search,
+      role
     );
   }
 

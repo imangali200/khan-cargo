@@ -22,7 +22,7 @@ export class UserService {
         return user;
     }
 
-    async findAllUsers(page: number, limit: number, search?: string) {
+    async findAllUsers(page: number, limit: number, search?: string, role?: string) {
         const qb = this.userRepository.createQueryBuilder('user')
             .leftJoinAndSelect('user.branch', 'branch');
 
@@ -31,6 +31,10 @@ export class UserService {
                 '(user.name ILIKE :search OR user.lastName ILIKE :search OR user.phoneNumber ILIKE :search OR user.telegramUsername ILIKE :search OR user.userCode ILIKE :search OR CAST(user.id AS TEXT) = :exactSearch)',
                 { search: `%${search}%`, exactSearch: search }
             );
+        }
+
+        if (role) {
+            qb.andWhere('user.role = :role', { role: role.toLowerCase() === 'admin' ? 'admin' : role });
         }
 
         qb.addSelect(`CASE "user"."role" WHEN 'superAdmin' THEN 0 WHEN 'admin' THEN 1 ELSE 2 END`, 'role_priority')
