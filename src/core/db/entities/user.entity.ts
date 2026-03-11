@@ -21,12 +21,11 @@ export class UserEntity extends BaseCustomEntity {
     @IsOptional()
     lastName: string;
 
-    @Column({ length: 255, nullable: true, unique: true })
-    @ApiProperty({ example: '@username', required: false, description: 'Telegram nickname starting with @' })
+    @Column({ nullable: true })
+    @ApiProperty({ example: '123456789', required: false, description: 'Telegram chat ID for direct messages' })
     @IsString()
     @IsOptional()
-    telegramUsername?: string;
-
+    telegramChatId?: string;
 
     @Column({ length: 500, nullable: true })
     @ApiProperty({ required: false })

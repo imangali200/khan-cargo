@@ -58,6 +58,19 @@ export class TelegramService {
         }
     }
 
+    async linkUserByChatId(userCode: string, chatId: string): Promise<{ success: boolean; userName?: string }> {
+        const user = await this.userRepo.findOne({ where: { userCode } });
+        if (!user) {
+            return { success: false };
+        }
+
+        user.telegramChatId = chatId;
+        await this.userRepo.save(user);
+        this.logger.log(`Linked user ${user.userCode} (ID: ${user.id}) to Telegram chatId: ${chatId}`);
+
+        return { success: true, userName: `${user.name} ${user.lastName || ''}`.trim() };
+    }
+
     async getSettings(): Promise<{ pricePerKg: number; dollarRate: number }> {
         const settings = await this.settingsRepo.findOne({ where: { id: 1 } });
 
@@ -102,9 +115,15 @@ export class TelegramService {
             if (!user) continue;
 
             const message = this.buildInvoiceMessage(user, userItems, branch, pricePerKg, dollarRate);
-            const success = await this.sendMessage(globalChatId, message, branch.telegramThreadId);
+            const groupSuccess = await this.sendMessage(globalChatId, message, branch.telegramThreadId);
 
-            if (success) {
+            // Send personal DM to user if they have a telegramChatId
+            if (user.telegramChatId) {
+                const personalMessage = this.buildPersonalMessage(user, userItems, branch, pricePerKg, dollarRate);
+                await this.sendMessage(user.telegramChatId, personalMessage);
+            }
+
+            if (groupSuccess) {
                 await this.trackingRepo.update(
                     userItems.map(i => i.id),
                     { isTelegramNotified: true }
@@ -126,7 +145,7 @@ export class TelegramService {
     ): string {
         const userName = user.name || 'Клиент';
         const userCode = user.userCode || `ID:${user.id}`;
-        const mention = user.telegramUsername ? (user.telegramUsername.startsWith('@') ? user.telegramUsername : `@${user.telegramUsername}`) : `<b>${userName}</b>`;
+        const mention = `<b>${userName}</b>`;
 
         let totalWeight = 0;
         const lines: string[] = [];
@@ -152,6 +171,44 @@ export class TelegramService {
             `💰 Стоимость: ${totalWeight.toFixed(1)} × $${pricePerKg} = <b>$${costUsd}</b> (≈ ${costTenge.toLocaleString()} ₸)`,
             ``,
             `📍 ${branch.name}`,
+        ].join('\n');
+    }
+
+    private buildPersonalMessage(
+        user: UserEntity,
+        items: TrackingItemEntity[],
+        branch: BranchEntity,
+        pricePerKg: number,
+        dollarRate: number,
+    ): string {
+        const userName = user.name || 'Клиент';
+
+        let totalWeight = 0;
+        const lines: string[] = [];
+
+        items.forEach((item, idx) => {
+            const w = item.weight ? Number(item.weight) : 0;
+            totalWeight += w;
+            const weightStr = w > 0 ? `${w} кг` : 'вес неизвестен';
+            lines.push(`${idx + 1}. <b>${item.trackingCode}</b> — ${weightStr}`);
+        });
+
+        const costUsd = (totalWeight * pricePerKg).toFixed(1);
+        const costTenge = Math.round(totalWeight * pricePerKg * dollarRate);
+
+        return [
+            `👋 Сәлем, <b>${userName}</b>!`,
+            ``,
+            `📦 Сіздің товарларыңыз филиалға жетті:`,
+            ``,
+            ...lines,
+            ``,
+            `📊 Барлығы: <b>${items.length}</b> товар, <b>${totalWeight.toFixed(1)}</b> кг`,
+            `💰 Құны: ${totalWeight.toFixed(1)} × $${pricePerKg} = <b>$${costUsd}</b> (≈ ${costTenge.toLocaleString()} ₸)`,
+            ``,
+            `📍 ${branch.name}`,
+            ``,
+            `Алып кетуге болады ✅`,
         ].join('\n');
     }
 }

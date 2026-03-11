@@ -1,5 +1,5 @@
 import { ApiProperty } from "@nestjs/swagger";
-import { IsEmail, IsNumber, IsOptional, IsString } from "class-validator";
+import { IsNumber, IsOptional, IsString } from "class-validator";
 
 export class UpdateProfileDto {
     @IsString()
@@ -14,13 +14,8 @@ export class UpdateProfileDto {
 
     @IsString()
     @IsOptional()
-    @ApiProperty({ example: '@username', required: false })
-    telegramUsername?: string;
-
-    @IsEmail()
-    @IsOptional()
-    @ApiProperty({ example: 'user@example.com', required: false })
-    email?: string;
+    @ApiProperty({ example: '123456789', required: false, description: 'Telegram chat ID for direct messages' })
+    telegramChatId?: string;
 
     @IsNumber()
     @IsOptional()

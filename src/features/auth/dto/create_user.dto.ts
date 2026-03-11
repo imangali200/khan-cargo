@@ -30,8 +30,8 @@ export class CreateUserDto {
 
     @IsString()
     @IsOptional()
-    @ApiProperty({ example: '@username', required: false, description: 'Telegram nickname starting with @' })
-    telegramUsername?: string;
+    @ApiProperty({ example: '123456789', required: false, description: 'Telegram chat ID for direct messages' })
+    telegramChatId?: string;
 
     @IsEnum(UserRoles)
     @IsOptional()

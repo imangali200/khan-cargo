@@ -138,6 +138,15 @@ export class TrackingService {
         const prevStatus = item.currentStatus;
         item.currentStatus = dto.status;
 
+        // Populate dates based on new status
+        if (dto.status === TrackingStatus.ARRIVED_CHINA_WAREHOUSE && !item.chinaArrivalDate) {
+            item.chinaArrivalDate = new Date();
+        } else if (dto.status === TrackingStatus.ARRIVED_BRANCH && !item.khanCargoArrivalDate) {
+            item.khanCargoArrivalDate = new Date();
+        } else if (dto.status === TrackingStatus.PICKED_UP && !item.deliveryDate) {
+            item.deliveryDate = new Date();
+        }
+
         if (dto.weight !== undefined) {
             item.weight = dto.weight;
         }
@@ -217,6 +226,11 @@ export class TrackingService {
 
         if (STATUS_ORDER[targetStatus] > STATUS_ORDER[item.currentStatus]) {
             item.currentStatus = targetStatus;
+
+            // Set Khan Cargo arrival date if not already set
+            if (!item.khanCargoArrivalDate) {
+                item.khanCargoArrivalDate = new Date();
+            }
         }
 
         // If item doesn't have a branch, assign it to the admin's branch

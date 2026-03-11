@@ -28,7 +28,7 @@ export class UserService {
 
         if (search) {
             qb.where(
-                '(user.name ILIKE :search OR user.lastName ILIKE :search OR user.phoneNumber ILIKE :search OR user.telegramUsername ILIKE :search OR user.userCode ILIKE :search OR CAST(user.id AS TEXT) = :exactSearch)',
+                '(user.name ILIKE :search OR user.lastName ILIKE :search OR user.phoneNumber ILIKE :search OR user.userCode ILIKE :search OR CAST(user.id AS TEXT) = :exactSearch)',
                 { search: `%${search}%`, exactSearch: search }
             );
         }
@@ -61,11 +61,6 @@ export class UserService {
 
         const codeExists = await this.userRepository.findOne({ where: { userCode: createDto.userCode } });
         if (codeExists) throw new ConflictException(`Пользователь с кодом ${createDto.userCode} уже существует`);
-
-        if (createDto.telegramUsername) {
-            const usernameExists = await this.userRepository.findOne({ where: { telegramUsername: createDto.telegramUsername } });
-            if (usernameExists) throw new ConflictException('Пользователь с таким Telegram ником уже существует');
-        }
 
         const hashPassword = await bcrypt.hash(createDto.password, 10);
         const newUser = this.userRepository.create({
