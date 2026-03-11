@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, UploadedFile, UseInterceptors } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, UploadedFile, UseInterceptors, ForbiddenException } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
 import { ApiBody, ApiConsumes, ApiOperation, ApiQuery, ApiTags } from "@nestjs/swagger";
 import { Auth } from "src/core/decorators/auth.decorators";
@@ -67,6 +67,16 @@ export class TrackingController {
             page ? Number(page) : 1,
             limit ? Number(limit) : 20,
         );
+    }
+
+    @Patch('quick-update')
+    @Auth([UserRoles.ADMIN, UserRoles.SUPERADMIN])
+    @ApiOperation({ summary: 'Admin Quick Update: By tracking code (ideal for scanner)' })
+    async quickUpdate(
+        @Body() dto: QuickUpdateDto,
+        @CurrentUser() user: any,
+    ) {
+        return this.trackingService.quickUpdateByCode(dto, user);
     }
 
     @Get(':id')
@@ -168,16 +178,6 @@ export class TrackingController {
         @CurrentUser() user: any,
     ) {
         return this.excelImportService.updateMasterStatus(trackingCode, status, user.sub);
-    }
-
-    @Patch('quick-update')
-    @Auth([UserRoles.ADMIN, UserRoles.SUPERADMIN])
-    @ApiOperation({ summary: 'Admin Quick Update: By tracking code (ideal for scanner)' })
-    async quickUpdate(
-        @Body() dto: QuickUpdateDto,
-        @CurrentUser() user: any,
-    ) {
-        return this.trackingService.quickUpdateByCode(dto, user);
     }
 
     @Post('notify-arrivals')
